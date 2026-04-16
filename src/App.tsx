@@ -747,7 +747,7 @@ export const Workshop = () => {
             <div ref={shareCardRef} className="relative w-full aspect-[4/5] sm:aspect-square lg:aspect-[4/5] flex flex-col">
               
               {/* Top: Image Section */}
-              <div className="relative w-full h-[65%] overflow-hidden bg-black">
+              <div className="relative w-full h-[60%] sm:h-[65%] overflow-hidden bg-black">
                 <AnimatePresence mode="wait">
                   {imageUrl ? (
                     <motion.img 
@@ -798,25 +798,25 @@ export const Workshop = () => {
               </div>
 
               {/* Bottom: Content Section */}
-              <div className="relative w-full h-[35%] bg-gradient-to-b from-[#121212] to-[#0a0a0a] p-6 sm:p-8 flex flex-col justify-between z-20">
+              <div className="relative w-full h-[40%] sm:h-[35%] bg-gradient-to-b from-[#121212] to-[#0a0a0a] p-4 sm:p-8 flex flex-col justify-between z-20">
                 {/* Decorative Line */}
-                <div className="absolute top-0 left-8 right-8 h-px bg-gradient-to-r from-transparent via-primary/50 to-transparent" />
+                <div className="absolute top-0 left-4 right-4 sm:left-8 sm:right-8 h-px bg-gradient-to-r from-transparent via-primary/50 to-transparent" />
 
                 <div>
-                  <div className="flex items-baseline justify-between mb-3">
-                    <h1 className="font-headline text-3xl sm:text-4xl text-white font-light tracking-tight">
+                  <div className="flex items-baseline justify-between mb-2 sm:mb-3">
+                    <h1 className="font-headline text-2xl sm:text-4xl text-white font-light tracking-tight">
                       {!isReadyToGenerate && !imageUrl ? '等待调配' : (isGeneratingText ? '灵感涌现中...' : cocktailName)}
                     </h1>
                   </div>
                   
-                  <p className="text-white/60 font-body text-sm leading-relaxed line-clamp-2 font-light">
+                  <p className="text-white/60 font-body text-xs sm:text-sm leading-relaxed line-clamp-3 sm:line-clamp-2 font-light">
                     {!isReadyToGenerate && !imageUrl ? '选择四种原料以生成您的专属酒卡' : (isGeneratingText ? '正在为您撰写专属的品鉴词...' : cocktailDesc)}
                   </p>
                 </div>
 
                 {/* Flavor Profile Mini-Tags */}
-                <div className="mt-4 flex items-end justify-between gap-3">
-                  <div className="flex flex-wrap items-center gap-3">
+                <div className="mt-2 sm:mt-4 flex items-end justify-between gap-2 sm:gap-3">
+                  <div className="min-w-0 flex flex-1 items-center gap-2 sm:gap-3 overflow-x-auto pr-1">
                   {base && (
                     <div className="shrink-0 whitespace-nowrap flex items-center gap-1.5 px-2.5 py-1 rounded-sm border border-white/10 bg-white/5">
                       <div className="w-1 h-1 rounded-full bg-primary" />
