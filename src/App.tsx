@@ -582,46 +582,13 @@ export const Workshop = () => {
       setIsGenerating(true);
       setIsGeneratingText(true);
       try {
-        const geminiApiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
-        if (!geminiApiKey) {
-          throw new Error('NEXT_PUBLIC_GEMINI_API_KEY is not configured.');
-        }
-
-        // 1. Generate Image via ModelScope API
+        // Generate Image via ModelScope API
         const promptText = getPrompt();
-        const imagePromise = fetch('/api/generate-image', {
+        const imageRes = await fetch('/api/generate-image', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ prompt: promptText })
         }).then(res => res.json());
-
-        // 2. Generate Text
-        const baseName = base ? baseMap[base]?.name : '';
-        const mixersName = mixers.length > 0 ? mixers.map(m => mixerMap[m]?.name).join('·') : '·';
-        const garnishesName = garnishes.length > 0 ? garnishes.map(g => garnishMap[g]?.name).join('·') : '·';
-        const glassName = glassware ? glasswareMap[glassware]?.name : '';
-        
-        const textPrompt = `请为一杯包含以下原料的鸡尾酒创作一个独特的名字和一段介绍：\n基酒：${baseName}\n辅料：${mixersName}\n装饰：${garnishesName}\n杯具：${glassName}\n\n要求：\n1. 名字要独特、有创意（不超过8个字）。\n2. 介绍需要1-2句话，生动形象。\n3. 文本的整体风格必须从以下几种中随机选择一种：活泼调皮、安静典雅、诗书气质、豪放不羁、抽象搞怪。\n4. 请直接返回JSON格式，包含 "name" 和 "description" 两个字段。`;
-
-        const { GoogleGenAI, Type } = await import('@google/genai');
-        const ai = new GoogleGenAI({ apiKey: geminiApiKey });
-        const textPromise = ai.models.generateContent({
-          model: 'gemini-3-flash-preview',
-          contents: textPrompt,
-          config: {
-            responseMimeType: "application/json",
-            responseSchema: {
-              type: Type.OBJECT,
-              properties: {
-                name: { type: Type.STRING },
-                description: { type: Type.STRING }
-              },
-              required: ["name", "description"]
-            }
-          }
-        });
-
-        const [imageRes, textRes] = await Promise.all([imagePromise, textPromise]);
         
         // Handle Image
         if (imageRes.success && imageRes.imageData) {
@@ -630,13 +597,6 @@ export const Workshop = () => {
           setQuotaError(imageRes.message || 'API quota exceeded');
         } else {
           console.error('Image generation failed:', imageRes.error);
-        }
-
-        // Handle Text
-        if (textRes.text) {
-          const data = JSON.parse(textRes.text);
-          setCocktailName(data.name);
-          setCocktailDesc(data.description);
         }
       } catch (error) {
         console.error("Failed to generate content:", error);
