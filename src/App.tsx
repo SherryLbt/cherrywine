@@ -5,7 +5,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   X, 
@@ -22,9 +22,17 @@ import {
   Facebook,
   Instagram,
   Link2,
-  Check
+  Check,
+  Download
 } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
+import {
+  baseMap,
+  buildCocktailPrompt,
+  garnishMap,
+  glasswareMap,
+  mixerMap,
+} from '@/lib/cocktail/ingredients';
 
 // --- Components ---
 
@@ -443,7 +451,7 @@ const QuotaErrorModal = ({
             {message}
           </p>
           <p className="text-white/40 text-xs">
-            Please check your ModelScope account quota or try again later.
+            Please check your image generation API quota or try again later.
           </p>
         </div>
         <div className="p-4 bg-surface-container-highest/30 border-t border-white/5">
@@ -473,6 +481,8 @@ export const Workshop = () => {
   const [isGeneratingText, setIsGeneratingText] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [quotaError, setQuotaError] = useState<string | null>(null);
+  const [isDownloadingCard, setIsDownloadingCard] = useState(false);
+  const shareCardRef = useRef<HTMLDivElement | null>(null);
 
   const toggleMixer = (m: string) => {
     setMixers(prev => prev.includes(m) ? prev.filter(x => x !== m) : [...prev, m]);
@@ -483,46 +493,7 @@ export const Workshop = () => {
   };
 
   const isReadyToGenerate = base && mixers.length > 0 && garnishes.length > 0 && glassware;
-  const imageSeed = isReadyToGenerate ? `${base}-${mixers.sort().join('-')}-${garnishes.sort().join('-')}-${glassware}` : null;
-
-  const baseMap: Record<string, { name: string, amount: string, color: string }> = {
-    vodka: { name: '伏特加', amount: '45ml', color: 'bg-primary' },
-    gin: { name: '琴酒', amount: '45ml', color: 'bg-primary' },
-    rum: { name: '朗姆酒', amount: '45ml', color: 'bg-primary' },
-    whiskey: { name: '威士忌', amount: '45ml', color: 'bg-primary' },
-    tequila: { name: '龙舌兰', amount: '45ml', color: 'bg-primary' },
-    brandy: { name: '白兰地', amount: '45ml', color: 'bg-primary' },
-    liqueur: { name: '利口酒', amount: '30ml', color: 'bg-primary' }
-  };
-
-  const mixerMap: Record<string, { name: string, amount: string, color: string }> = {
-    '柠檬汁': { name: '柠檬汁', amount: '15ml', color: 'bg-secondary' },
-    '青柠汁': { name: '青柠汁', amount: '15ml', color: 'bg-secondary' },
-    '蔓越莓汁': { name: '蔓越莓汁', amount: '60ml', color: 'bg-secondary' },
-    '苏打水': { name: '苏打水', amount: '120ml', color: 'bg-secondary' },
-    '糖浆': { name: '糖浆', amount: '10ml', color: 'bg-secondary' },
-    '冰块': { name: '冰块', amount: '适量', color: 'bg-secondary' },
-    '苦精': { name: '苦精', amount: '2 dashes', color: 'bg-secondary' },
-    '薄荷': { name: '薄荷', amount: '少许', color: 'bg-secondary' }
-  };
-
-  const garnishMap: Record<string, { name: string, amount: string, color: string }> = {
-    '樱桃': { name: '樱桃', amount: '1枚', color: 'bg-tertiary-dim' },
-    '橙片': { name: '橙片', amount: '1片', color: 'bg-tertiary-dim' },
-    '青柠角': { name: '青柠角', amount: '1角', color: 'bg-tertiary-dim' },
-    '薄荷叶': { name: '薄荷叶', amount: '1片', color: 'bg-tertiary-dim' },
-    '橄榄': { name: '橄榄', amount: '1枚', color: 'bg-tertiary-dim' },
-    '糖霜边': { name: '糖霜边', amount: '1圈', color: 'bg-tertiary-dim' },
-    '鸡尾酒伞': { name: '鸡尾酒伞', amount: '1把', color: 'bg-tertiary-dim' }
-  };
-
-  const glasswareMap: Record<string, { name: string, amount: string, color: string }> = {
-    'martini': { name: '马天尼杯', amount: '1个', color: 'bg-outline' },
-    'old-fashioned': { name: '古典杯', amount: '1个', color: 'bg-outline' },
-    'collins': { name: '柯林杯', amount: '1个', color: 'bg-outline' },
-    'hurricane': { name: '飓风杯', amount: '1个', color: 'bg-outline' },
-    'flute': { name: '笛形杯', amount: '1个', color: 'bg-outline' }
-  };
+  const imageSeed = isReadyToGenerate ? `${base}-${[...mixers].sort().join('-')}-${[...garnishes].sort().join('-')}-${glassware}` : null;
 
   const handleRandomInspiration = () => {
     // 1. Random Base
@@ -552,27 +523,52 @@ export const Workshop = () => {
     setGlassware(randomGlass);
   };
 
-  const getPrompt = () => {
-    const baseName = base ? baseMap[base]?.name : '';
-    const mixersName = mixers.length > 0 ? mixers.map(m => mixerMap[m]?.name).join('+') : '';
-    const garnishesName = garnishes.length > 0 ? garnishes.map(g => garnishMap[g]?.name).join('+') : '';
-    const glassName = glassware ? glasswareMap[glassware]?.name : '';
+  const handleDownloadCard = async () => {
+    if (!shareCardRef.current || isDownloadingCard) return;
 
-    const prefixParts = [baseName];
-    if (mixersName) prefixParts.push(mixersName);
-    if (garnishesName) prefixParts.push(garnishesName);
-    if (glassName) prefixParts.push(glassName);
+    setIsDownloadingCard(true);
+    try {
+      const { toPng } = await import('html-to-image');
+      const dataUrl = await toPng(shareCardRef.current, {
+        cacheBust: true,
+        pixelRatio: 2,
+        backgroundColor: '#0a0a0a',
+        filter: (node) => {
+          if (!(node instanceof HTMLElement)) return true;
+          return node.dataset.excludeFromDownload !== 'true';
+        },
+      });
 
-    const prefix = prefixParts.join('+');
+      const fileName = (cocktailName || 'cocktail-card')
+        .replace(/[\\/:*?"<>|]/g, '')
+        .trim() || 'cocktail-card';
 
-    let desc = `一杯以${baseName}为基酒`;
-    if (mixersName) desc += `、加入${mixersName.replace(/\+/g, '、')}`;
-    if (garnishesName) desc += `、以${garnishesName.replace(/\+/g, '、')}点缀`;
-    if (glassName) desc += `、使用${glassName}盛装的鸡尾酒`;
+      const link = document.createElement('a');
+      link.href = dataUrl;
+      link.download = `${fileName}.png`;
+      link.click();
+    } catch (error) {
+      console.error('Failed to download cocktail card:', error);
+    } finally {
+      setIsDownloadingCard(false);
+    }
+  };
 
-    const prompt = `${prefix}，${desc}，产品摄影，居中构图，干净背景，真实液体质感，高光通透，高清细节，商业饮品海报风格`;
-    
-    return prompt;
+  const getPrompt = () => buildCocktailPrompt({ base, mixers, garnishes, glassware });
+
+  const getFallbackCopy = () => {
+    const baseName = base ? baseMap[base]?.name || '鸡尾酒' : '鸡尾酒';
+    const mixerNames = mixers.map((key) => mixerMap[key]?.name).filter(Boolean);
+    const garnishNames = garnishes.map((key) => garnishMap[key]?.name).filter(Boolean);
+    const glassName = glassware ? glasswareMap[glassware]?.name || '鸡尾酒杯' : '鸡尾酒杯';
+
+    const nameSeed = `${baseName}${garnishNames[0] || ''}`.replace(/[\/（(].*$/, '');
+    const name = `${nameSeed || '灵感'}特调`.slice(0, 12);
+    const desc =
+      `以${baseName}为基底，融合${mixerNames.length > 0 ? mixerNames.join('、') : '经典辅料'}，` +
+      `并以${garnishNames.length > 0 ? garnishNames.join('、') : '简洁装饰'}点缀，在${glassName}中呈现平衡细腻的风味层次。`;
+
+    return { name, description: desc };
   };
 
   useEffect(() => {
@@ -582,24 +578,62 @@ export const Workshop = () => {
       setIsGenerating(true);
       setIsGeneratingText(true);
       try {
-        // Generate Image via ModelScope API
         const promptText = getPrompt();
-        const imageRes = await fetch('/api/generate-image', {
+        const imageRequest = fetch('/api/generate/nvidia-image', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ prompt: promptText })
         }).then(res => res.json());
-        
-        // Handle Image
-        if (imageRes.success && imageRes.imageData) {
-          setImageUrl(imageRes.imageData);
-        } else if (imageRes.error === 'quota_exceeded') {
-          setQuotaError(imageRes.message || 'API quota exceeded');
+
+        const textRequest = fetch('/api/generate/text', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            base,
+            mixers,
+            garnishes,
+            glassware,
+            prompt: promptText,
+          })
+        }).then(res => res.json());
+
+        const [imageResult, textResult] = await Promise.allSettled([imageRequest, textRequest]);
+
+        if (imageResult.status === 'fulfilled') {
+          const imageRes = imageResult.value;
+          if (imageRes.success && imageRes.imageData) {
+            setImageUrl(imageRes.imageData);
+          } else if (imageRes.error === 'quota_exceeded') {
+            setQuotaError(imageRes.message || 'API quota exceeded');
+          } else {
+            console.error('Image generation failed:', imageRes.error);
+          }
         } else {
-          console.error('Image generation failed:', imageRes.error);
+          console.error('Image request failed:', imageResult.reason);
+        }
+
+        if (textResult.status === 'fulfilled') {
+          const textRes = textResult.value;
+          if (textRes.success && textRes.name && textRes.description) {
+            setCocktailName(textRes.name);
+            setCocktailDesc(textRes.description);
+          } else {
+            console.error('Text generation failed:', textRes.error || textRes.message);
+            const fallback = getFallbackCopy();
+            setCocktailName(fallback.name);
+            setCocktailDesc(fallback.description);
+          }
+        } else {
+          console.error('Text request failed:', textResult.reason);
+          const fallback = getFallbackCopy();
+          setCocktailName(fallback.name);
+          setCocktailDesc(fallback.description);
         }
       } catch (error) {
         console.error("Failed to generate content:", error);
+        const fallback = getFallbackCopy();
+        setCocktailName(fallback.name);
+        setCocktailDesc(fallback.description);
       } finally {
         setIsGenerating(false);
         setIsGeneratingText(false);
@@ -642,7 +676,7 @@ export const Workshop = () => {
               <div>
                 <label className="text-xs tracking-widest text-on-surface/40 uppercase font-label mb-3 block">添加辅料</label>
                 <div className="flex flex-wrap gap-2">
-                  {Object.keys(mixerMap).map((m) => (
+                  {Object.entries(mixerMap).map(([m, val]) => (
                     <span 
                       key={m}
                       onClick={() => toggleMixer(m)}
@@ -653,7 +687,7 @@ export const Workshop = () => {
                           : "bg-surface-bright text-on-surface border border-outline-variant hover:bg-primary/20 hover:border-primary"
                       )}
                     >
-                      {m}
+                      {val.name}
                     </span>
                   ))}
                 </div>
@@ -710,7 +744,7 @@ export const Workshop = () => {
         <section className="md:col-span-8 lg:col-span-6 flex flex-col gap-6">
           <div className="relative w-full bg-[#0a0a0a] rounded-3xl overflow-hidden shadow-2xl border border-white/10 group">
             {/* Shareable Card Container */}
-            <div className="relative w-full aspect-[4/5] sm:aspect-square lg:aspect-[4/5] flex flex-col">
+            <div ref={shareCardRef} className="relative w-full aspect-[4/5] sm:aspect-square lg:aspect-[4/5] flex flex-col">
               
               {/* Top: Image Section */}
               <div className="relative w-full h-[65%] overflow-hidden bg-black">
@@ -781,25 +815,38 @@ export const Workshop = () => {
                 </div>
 
                 {/* Flavor Profile Mini-Tags */}
-                <div className="flex items-center gap-3 mt-4">
+                <div className="mt-4 flex items-end justify-between gap-3">
+                  <div className="flex flex-wrap items-center gap-3">
                   {base && (
-                    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-sm border border-white/10 bg-white/5">
+                    <div className="shrink-0 whitespace-nowrap flex items-center gap-1.5 px-2.5 py-1 rounded-sm border border-white/10 bg-white/5">
                       <div className="w-1 h-1 rounded-full bg-primary" />
                       <span className="text-[10px] text-white/70 font-label tracking-wider">{baseMap[base]?.name}基底</span>
                     </div>
                   )}
                   {mixers.length > 0 && (
-                    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-sm border border-white/10 bg-white/5">
+                    <div className="shrink-0 whitespace-nowrap flex items-center gap-1.5 px-2.5 py-1 rounded-sm border border-white/10 bg-white/5">
                       <div className="w-1 h-1 rounded-full bg-secondary" />
                       <span className="text-[10px] text-white/70 font-label tracking-wider">{mixers.length}种风味</span>
                     </div>
                   )}
                   {(base || mixers.length > 0 || garnishes.length > 0 || glassware) && (
-                    <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-sm border border-white/10 bg-white/5">
+                    <div className="shrink-0 whitespace-nowrap flex items-center gap-1.5 px-2.5 py-1 rounded-sm border border-white/10 bg-white/5">
                       <div className="w-1 h-1 rounded-full bg-tertiary" />
                       <span className="text-[10px] text-white/70 font-label tracking-wider">特调</span>
                     </div>
                   )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleDownloadCard}
+                    data-exclude-from-download="true"
+                    className="h-8 w-8 shrink-0 rounded-md border border-white/20 bg-white/5 text-white hover:bg-white/10 transition-colors flex items-center justify-center disabled:opacity-60 disabled:cursor-not-allowed"
+                    aria-label="下载酒卡"
+                    title="下载酒卡"
+                    disabled={isDownloadingCard}
+                  >
+                    <Download className="w-4 h-4" />
+                  </button>
                 </div>
               </div>
             </div>
